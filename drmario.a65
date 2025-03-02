@@ -254,6 +254,9 @@ L4014_OAMDMA     := $4014
 L4016_           := $4016
 L4017_           := $4017
 
+L40F0_FIFO_STAT  := $40F0
+L40F1_FIFO_DATA  := $40F1
+
 .segment "CODE"
 
 ; ----------------------------------------------------------------------------
@@ -7440,8 +7443,8 @@ RB7C7_GET_INPUT:
     and L48_TEMP                                ; B7DD 25 48
     sta LF5_P1_INPUT_NEW                        ; B7DF 85 F5
     lda LF6_P2_INPUT_NEW                        ; B7E1 A5 F6
-    and L49_TEMP                                ; B7E3 25 49
-    sta LF6_P2_INPUT_NEW                        ; B7E5 85 F6
+    jsr RN8_COMMS
+    nop
 LB7E7:
     ldx #$01                                    ; B7E7 A2 01
     loop
@@ -8380,17 +8383,77 @@ LFF00_RESET_HANDLER:
 .ifndef REV_A
     .byte $00,$00
 .endif
-    .byte $00,$00,$00,$00,$00,$00
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+RN8_COMMS:
+.scope
+    ; we replaced these two instructions with a jsr
+    and L49_TEMP                                ; B7E3 25 49
+    sta LF6_P2_INPUT_NEW                        ; B7E5 85 F6
+    lda #$ff
+    sta L4A_TEMP
+    lda L40F0_FIFO_STAT
+    if_pl
+      ldx #2
+RN8_COMMS_READ_WRITE:
+      ; write a byte from FIFO
+      jsr RREAD_FIFO_CMD
+      sta L47_TEMP
+      ; first time through the loop, skip the write if the address is $ffff;
+      ; second time skip if it's $fffe
+      lda L48_TEMP
+      cmp #$ff
+      if_ne
+        lda L49_TEMP
+        cmp L4A_TEMP
+        if_ne
+          lda L47_TEMP
+          ldy #0
+          sta (L48_TEMP),y
+        end_if
+      end_if
+
+      ; read some bytes and send to FIFO
+      jsr RREAD_FIFO_CMD
+      tay
+      .scope
+LOOP:
+        beq BREAK
+        lda (L48_TEMP),y
+        sta L40F1_FIFO_DATA
+        dey
+        jmp LOOP
+BREAK:
+      .endscope
+      dec L4A_TEMP
+      dex
+      bne RN8_COMMS_READ_WRITE
+    end_if
+    rts
+.endscope
+
+RREAD_FIFO_CMD:
+    jsr RREAD_FIFO_BYTE
+    sta L48_TEMP
+    jsr RREAD_FIFO_BYTE
+    sta L49_TEMP
+    jsr RREAD_FIFO_BYTE
+    rts
+
+RREAD_FIFO_BYTE:
+    lda L40F0_FIFO_STAT
+    bmi RREAD_FIFO_BYTE
+    lda L40F1_FIFO_DATA
+    rts
+;    .byte $00,$00,$00,$00,$00,$00
+;    .byte $00,$00,$00,$00,$00,$00,$00,$00
+;    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+;    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+;    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+;    .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+;    .byte $00,$00,$00,$00,$00,$00,$00,$00
+;    .byte $00,$00,$00,$00,$00,$00,$00,$00
+;    .byte $00,$00,$00,$00,$00,$00,$00,$00
+;    .byte $00,$00,$00,$00,$00,$00,$00,$00
+    .byte $FF,$FF,$FF,$FF;,$FF,$FF,$FF,$FF
     .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
     .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
     .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
