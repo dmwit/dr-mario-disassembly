@@ -8414,7 +8414,7 @@ WRITE_READ_LOOP:
 
     ; do the write unless the write address is 0xfffe (first loop) or 0xffff (second loop)
     lda L48_TEMP
-    sbc L4B_TEMP
+    cmp L4B_TEMP
     if_eq
       lda L49_TEMP
       cmp #$FF
@@ -8442,12 +8442,13 @@ SEND_CMD_USB_WR_LOOP:
     sta L40F0_FIFO_DATA
 
     ; send the ED some stuff
-    dey
 SEND_BYTES_LOOP:
+    dey
+    bmi SEND_BYTES_LOOP_DONE
     lda (L48_TEMP),y
     sta L40F0_FIFO_DATA
-    dey
-    bpl SEND_BYTES_LOOP
+    jmp SEND_BYTES_LOOP
+SEND_BYTES_LOOP_DONE:
 
     ; go again maybe
     inc L4B_TEMP
@@ -8482,12 +8483,29 @@ RED_AWAIT_BYTE:
     rts
 
 RED_RECORD_WAIT:
-    inc L0705_TOP_SCORE_5
+    inc L0729_SCORE_0
     jsr R8FF4_INCREMENT_SCORE + $901C - $8FF4
-    lda #8
+    lda #4
     ora L52_REDRAW_FLAGS
     sta L52_REDRAW_FLAGS
     jmp RED_AWAIT_BYTE
+
+;PRINT_TO_TOP_SCORE:
+;    lda #8
+;    ora L52_REDRAW_FLAGS
+;    sta L52_REDRAW_FLAGS
+;    sta L4C_TEMP
+;    and #$f
+;    sta L0700_TOP_SCORE_0,x
+;    inx
+;    lda L4C_TEMP
+;    lsr
+;    lsr
+;    lsr
+;    lsr
+;    sta L0700_TOP_SCORE_0,x
+;    inx
+;    rts
 .endscope
 
 CMD_USB_WR:
@@ -8511,7 +8529,7 @@ CMD_USB_WR:
 ;    .byte $00,$00,$00,$00,$00,$00,$00,$00
 ;    .byte $00,$00,$00,$00,$00,$00,$00,$00
 ;    .byte $00,$00,$00,$00,$00,$00,$00,$00
-    .byte $FF,$FF,$FF;,$FF,$FF,$FF,$FF,$FF
+    .byte $FF;,$FF,$FF,$FF,$FF,$FF,$FF,$FF
     .byte $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
 ; ----------------------------------------------------------------------------
 ; Entry points to audio code
